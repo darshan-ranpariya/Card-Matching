@@ -18,7 +18,6 @@ public class SaveLoadService : ISaveLoadService
 
     public StageData LoadStageData()
     {
-        Debug.Log("Loading saved data");
         string json = System.IO.File.ReadAllText(stageDataPath);
         StageData stageData = JsonUtility.FromJson<StageData>(json);
         PlayerPrefs.SetInt(saveKey, 0);
@@ -27,7 +26,6 @@ public class SaveLoadService : ISaveLoadService
 
     public void SaveStageData(StageData stageData)
     {
-        Debug.Log("Saving data");
         PlayerPrefs.SetInt(saveKey, 1);
         string json = JsonUtility.ToJson(stageData);
         System.IO.File.WriteAllText(stageDataPath, json);
