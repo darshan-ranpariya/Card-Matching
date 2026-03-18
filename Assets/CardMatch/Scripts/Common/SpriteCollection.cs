@@ -9,26 +9,33 @@ public class SpriteCollection : ScriptableObject
 
     public Sprite GetSprite(int _index)
     {
-        try
+        if (_index >= 0 && _index < sprites.Count)
         {
             return sprites[_index];
         }
-        catch
-        {
-            return null;
-        }
+
+        Debug.LogWarning($"SpriteCollection: Index {_index} out of range. Sprite count: {sprites.Count}");
+        return null;
     }
 
     public Sprite GetSprite(string _name, System.StringComparison _comparison = System.StringComparison.CurrentCultureIgnoreCase)
     {
-        try
+        if (string.IsNullOrEmpty(_name))
         {
-            return sprites.Find((s)=> { return s.name.Equals(_name, _comparison); });
-        }
-        catch
-        {
+            Debug.LogWarning("SpriteCollection: Sprite name is null or empty");
             return null;
         }
+
+        for (int i = 0; i < sprites.Count; i++)
+        {
+            if (sprites[i] != null && sprites[i].name.Equals(_name, _comparison))
+            {
+                return sprites[i];
+            }
+        }
+
+        Debug.LogWarning($"SpriteCollection: Sprite with name '{_name}' not found");
+        return null;
     }
 
     static Texture2D _transparentTexture;

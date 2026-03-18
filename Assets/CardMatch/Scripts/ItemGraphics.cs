@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 public class ItemGraphics : MonoBehaviour
@@ -12,29 +9,57 @@ public class ItemGraphics : MonoBehaviour
     public int spriteIndex;
     public Sprite resetSprite;
 
-    private void OnValidate()
+    private GameObject graphicGameObject;
+
+    private void Awake()
     {
-        bgImg = GetComponent<Image>();
+        if (bgImg == null)
+        {
+            bgImg = GetComponent<Image>();
+        }
+
+        if (graphic != null)
+        {
+            graphicGameObject = graphic.gameObject;
+        }
     }
 
-    internal void Init()
+    private void OnValidate()
     {
-        graphic.sprite = sprites.GetSprite(spriteIndex);
-        bgImg.sprite = resetSprite;
+        if (bgImg == null)
+        {
+            bgImg = GetComponent<Image>();
+        }
+    }
+
+    public void Init()
+    {
+        if (sprites != null && graphic != null)
+        {
+            graphic.sprite = sprites.GetSprite(spriteIndex);
+        }
+
+        if (bgImg != null && resetSprite != null)
+        {
+            bgImg.sprite = resetSprite;
+        }
     }
 
     public void SetSprite()
     {
-        SetImageComps(true);
+        SetImageActive(true);
     }
 
     public void ResetSprite()
     {
-        SetImageComps(false);
+        SetImageActive(false);
     }
 
-    void SetImageComps(bool b)
+    private void SetImageActive(bool isActive)
     {
-        graphic.gameObject.SetActive(b);
+        if (graphicGameObject != null)
+        {
+            graphicGameObject.SetActive(isActive);
+        }
     }
 }

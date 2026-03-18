@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class ItemsHandler : MonoBehaviour
+public class ItemsHandler : MonoBehaviour, IGameManager
 {
     public static ItemsHandler inst;
 
@@ -14,27 +14,21 @@ public class ItemsHandler : MonoBehaviour
     public Sprite redSprite;
     public Sprite yellowSprite;
 
-    GridLayoutGroup gridLayout;
-    RectTransform gridLayoutRectTrans;
+    private GridLayoutGroup gridLayout;
+    private RectTransform gridLayoutRectTrans;
+    private int totalItemCount = 0;
+    private List<Item> allItemList = new List<Item>();
+    private Item currFlippedItem;
+    private Item currItem;
+    private Coroutine resetItemsCoroutine;
+    private int itemCount;
+    private StageData currStageData;
 
-    int totalItemCount = 0;
+    private ComboService comboService;
+    private ItemFactory itemFactory;
+    private ISaveLoadService saveLoadService;
+    private IUIService uiService;
 
-    [Header("ItemRelated")]
-    int[] spriteIndexes;
-    List<Item> allItemList = new List<Item>();
-
-    internal Item currFlippedItem;
-
-    [Header("Combo System")]
-    private int currentComboCount = 0;
-    private int comboScore = 0;
-    private bool isInCombo = false;
-
-
-    [HideInInspector]
-    int itemCount;
-
-    StageData currStageData;
     private void Awake()
     {
         inst = this;
@@ -42,98 +36,54 @@ public class ItemsHandler : MonoBehaviour
         gridLayoutRectTrans = itemPerent.GetComponent<RectTransform>();
         currStageData = new StageData();
         currStageData.cardItems = new List<CardItemData>();
+
+        uiService = UIManager.inst;
+        comboService = new ComboService(uiService);
+        itemFactory = new ItemFactory(itemPrefab, itemPerent, sprites, redSprite, yellowSprite);
+        saveLoadService = new SaveLoadService(Utility.stageDataPath, Utility.StageDataSavePrefKey);
     }
 
-    #region Generation Mathods
+    #region Item Generation
     public void GenerateItemAndIndex()
     {
-        spriteIndexes = Rand.GetIntUniqueArray(totalItemCount / 2, 0, sprites.sprites.Count);
         allItemList = new List<Item>();
-        ClearChildren(itemPerent);
-        GenerateItems();
-        GenerateIndexes();
+        itemFactory.ClearAllItems();
+        allItemList = itemFactory.CreateItems(totalItemCount, currStageData, this);
+        itemFactory.AssignIndexesToItems(allItemList, totalItemCount, currStageData);
+
+        foreach (var item in allItemList)
+        {
+            item.SetUIService(uiService);
+        }
+
         itemCount = totalItemCount;
     }
 
-    private void GenerateItems()
+    private void GenerateItemsFromStageData()
     {
-        Sprite s = (Rand.GetFloat(0f, 1f) < 0.5f ? yellowSprite : redSprite);
-        currStageData.isRedSprite = s == redSprite;
-        currStageData.cardItems.Clear();
-        for (int i = 0; i < totalItemCount; i++)
+        itemFactory.ClearAllItems();
+        allItemList = itemFactory.CreateItemsFromStageData(currStageData, totalItemCount, this, out int destroyedCount);
+
+        foreach (var item in allItemList)
         {
-            Item item = Instantiate(itemPrefab, itemPerent);
-            item.graphic.resetSprite = s;
-            allItemList.Add(item);
-            currStageData.cardItems.Add(new CardItemData());
+            item.SetUIService(uiService);
         }
-    }
 
-    void GenerateIndexes()
-    {
-        int[] totalIndexes = Rand.GetIntUniqueArray(totalItemCount, 0, totalItemCount + 1);
-        for (int i = 0, j = 0; i < totalItemCount - 1; i += 2, j++)
-        {
-            int idx0 = totalIndexes[i] == totalItemCount ? 0 : totalIndexes[i];
-            int idx1 = totalIndexes[i + 1] == totalItemCount ? 0 : totalIndexes[i + 1];
-            int spriteIdx = spriteIndexes[j];
-
-            allItemList[idx0].graphic.spriteIndex = allItemList[idx0].index = currStageData.cardItems[idx0].index = spriteIdx;
-            allItemList[idx0].Init();
-
-            allItemList[idx1].graphic.spriteIndex = allItemList[idx1].index = currStageData.cardItems[idx1].index = spriteIdx;
-            allItemList[idx1].Init();
-        }
-    }
-
-    void GenerateItemsFromStageData()
-    {
-        ClearChildren(itemPerent);
-        int destroiedCount = 0;
-        for (int i = 0; i < totalItemCount; i++)
-        {
-            Item item = Instantiate(itemPrefab, itemPerent);
-            item.graphic.resetSprite = currStageData.isRedSprite ? redSprite : yellowSprite;
-            item.graphic.spriteIndex = item.index = currStageData.cardItems[i].index;
-            if (currStageData.cardItems[i].isDestroyed)
-            {
-                item.DestroyItem();
-                destroiedCount++;
-            }
-            item.Init();
-            allItemList.Add(item);
-        }
-        itemCount = totalItemCount - destroiedCount;
-    }
-
-    public void ClearChildren(Transform transformToClearChildOf)
-    {
-        List<GameObject> children = new List<GameObject>();
-
-        for (int i = 0; i < transformToClearChildOf.childCount; i++)
-            children.Add(transformToClearChildOf.GetChild(i).gameObject);
-
-        for (int i = 0; i < children.Count; i++)
-        {
-            if (Application.isPlaying)
-            {
-                Destroy(children[i]);
-            }
-            else
-            {
-                DestroyImmediate(children[i]);
-            }
-        }
+        itemCount = totalItemCount - destroyedCount;
     }
     #endregion
 
-    Item currItem;
-    Coroutine ResetItemsCoroutine;
-    public void OnItemBtnClick(Item item)
+    #region Item Matching Logic
+    public void OnItemFlipped(Item item)
     {
         if (currFlippedItem != null && currItem != null)
         {
-            StopCoroutine(ResetItemsCoroutine);
+            if (resetItemsCoroutine != null)
+            {
+                StopCoroutine(resetItemsCoroutine);
+                resetItemsCoroutine = null;
+            }
+
             currItem.ResetItem();
             currFlippedItem.ResetItem();
             currFlippedItem = null;
@@ -147,32 +97,20 @@ public class ItemsHandler : MonoBehaviour
             {
                 if (currFlippedItem.index == currItem.index)
                 {
-                    // Match found - handle combo immediately
                     HandleMatch(currFlippedItem, currItem);
-
-                    // UIManager.inst.UpdateScore(1);
-                    // UIManager.inst.DelayedAction(currItem.DestroyItem, 1f);
-                    // UIManager.inst.DelayedAction(currFlippedItem.DestroyItem, 1f);
-                    // itemCount -= 2;
                     currFlippedItem = null;
                     currItem = null;
+
                     if (itemCount == 0)
                     {
-                        EndCombo();
-
-                        UIManager.inst.DelayedAction(() =>
-                        {
-                            UIManager.inst.TurnOffAllPanels();
-                            UIManager.inst.winPanel.gameObject.SetActive(true);
-                        }, .5f);
+                        comboService.EndCombo();
+                        uiService.ShowWinPanel();
                     }
                 }
                 else
                 {
-                    // Mismatch - end combo immediately and award score
-                    EndCombo();
-
-                    ResetItemsCoroutine = StartCoroutine(ResetFaultItems());
+                    comboService.EndCombo();
+                    resetItemsCoroutine = StartCoroutine(ResetFaultItems());
                 }
             }
             else
@@ -183,99 +121,44 @@ public class ItemsHandler : MonoBehaviour
         }
     }
 
-    #region Combo System
-
-
-    // Handle successful match
-    void HandleMatch(Item item1, Item item2)
+    private void HandleMatch(Item item1, Item item2)
     {
-        // Start or continue combo
-        if (!isInCombo)
-        {
-            StartCombo();
-        }
+        comboService.HandleMatch();
 
-        currentComboCount++;
-
-        // Calculate base score + combo bonus
-        int baseScore = 1;
-        int comboBonus = currentComboCount > 1 ? (currentComboCount - 1) : 0;
-        int matchScore = baseScore + comboBonus;
-
-        comboScore += matchScore;
-
-        // Show combo feedback
-        ShowComboFeedback(currentComboCount, matchScore);
-
-        // Destroy matched items
-        UIManager.inst.DelayedAction(item1.DestroyItem, 1f);
-        UIManager.inst.DelayedAction(item2.DestroyItem, 1f);
+        uiService.DelayedAction(item1.DestroyItem, 1f);
+        uiService.DelayedAction(item2.DestroyItem, 1f);
         itemCount -= 2;
-
-        Debug.Log($"Match! Combo: {currentComboCount}, Match Score: {matchScore}, Total Combo Score: {comboScore}");
     }
 
-    // Start a new combo
-    void StartCombo()
+    private IEnumerator ResetFaultItems()
     {
-        isInCombo = true;
-        currentComboCount = 0;
-        comboScore = 0;
-        Debug.Log("Combo Started!");
-    }
+        yield return new WaitForSeconds(0.5f);
 
-    // Show ongoing combo feedback
-    void ShowComboFeedback(int comboCount, int matchScore)
-    {
-        if (comboCount == 1)
+        if (currItem != null)
         {
-            Debug.Log("First match!");
-            UIManager.inst.comboTxt.gameObject.SetActive(false);
+            iTween.PunchPosition(currItem.gameObject, iTween.Hash("x", 0.2f, "time", 0.5f));
         }
-        else
+
+        if (currFlippedItem != null)
         {
-            Debug.Log($"COMBO x{comboCount}! +{matchScore} points");
-            UIManager.inst.comboTxt.text = $"COMBO x {comboCount} !";
-            UIManager.inst.comboTxt.gameObject.SetActive(true);
+            iTween.PunchPosition(currFlippedItem.gameObject, iTween.Hash("x", 0.2f, "time", 0.5f));
         }
-    }
 
-    // End combo and award accumulated score
-    void EndCombo()
-    {
-        if (!isInCombo) return;
-
-        // Award the accumulated combo score
-        UIManager.inst.UpdateScore(comboScore);
-
-        Debug.Log($"Combo Ended! Total pairs: {currentComboCount}, Final score awarded: {comboScore}");
-
-        // Reset combo state
-        isInCombo = false;
-        currentComboCount = 0;
-        comboScore = 0;
-    }
-
-
-    #endregion
-
-    IEnumerator ResetFaultItems()
-    {
-        yield return new WaitForSeconds(.5f);
-        if (currItem) iTween.PunchPosition(currItem.gameObject, iTween.Hash("x", .2f, "time", 0.5f));
-        if (currFlippedItem) iTween.PunchPosition(currFlippedItem.gameObject, iTween.Hash("x", .2f, "time", 0.5f));
         yield return new WaitForSeconds(1f);
         ResetItems();
+        resetItemsCoroutine = null;
     }
 
-    void ResetItems()
+    private void ResetItems()
     {
         if (currItem) currItem.ResetItem();
         if (currFlippedItem) currFlippedItem.ResetItem();
         currFlippedItem = null;
         currItem = null;
     }
+    #endregion
 
+    #region Grid Configuration
     public void OnGridSwitchOn(int row, int column, bool isLoadingSavedData = false)
     {
         float size = (gridLayoutRectTrans.rect.width - column - 1) / column;
@@ -285,20 +168,19 @@ public class ItemsHandler : MonoBehaviour
         UIManager.inst.totalTime = totalItemCount * 3;
         currStageData.row = row;
         currStageData.column = column;
+
         if (!isLoadingSavedData)
         {
             UIManager.inst.currTime = UIManager.inst.totalTime;
             GenerateItemAndIndex();
         }
     }
+    #endregion
 
-    #region LoadnSave the Stage data 
+    #region Save/Load System
     internal void LoadGameSavedData()
     {
-        // Load stored data
-        Debug.Log("Loading saved data");
-        string json = System.IO.File.ReadAllText(Utility.stageDataPath);
-        StageData stageData = JsonUtility.FromJson<StageData>(json);
+        StageData stageData = saveLoadService.LoadStageData();
         currStageData = stageData;
         UIManager.inst.currScore = stageData.score;
         UIManager.inst.currTime = UIManager.inst.totalTime = stageData.time;
@@ -306,20 +188,14 @@ public class ItemsHandler : MonoBehaviour
         UIManager.inst.StartGame();
         OnGridSwitchOn(stageData.row, stageData.column, true);
         GenerateItemsFromStageData();
-        PlayerPrefs.SetInt(Utility.StageDataSavePrefKey, 0);
     }
 
     internal void SaveStageData()
     {
-        Debug.Log("Saving data");
-        EndCombo();
-        PlayerPrefs.SetInt(Utility.StageDataSavePrefKey, 1);
+        comboService.EndCombo();
         currStageData.time = (int)UIManager.inst.currTime;
         currStageData.score = (int)UIManager.inst.currScore;
-
-        string json = JsonUtility.ToJson(currStageData);
-
-        System.IO.File.WriteAllText(Utility.stageDataPath, json);
+        saveLoadService.SaveStageData(currStageData);
     }
 
     public void UpdateStageData(int index)
@@ -335,6 +211,7 @@ public class CardItemData
     public int index;
     public bool isDestroyed = false;
 }
+
 [Serializable]
 public class StageData
 {

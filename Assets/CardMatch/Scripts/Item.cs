@@ -5,42 +5,70 @@ public class Item : MonoBehaviour
     public ItemGraphics graphic;
     public Animator animator;
     public int index;
-
     public bool isFlipped;
 
+    private IGameManager gameManager;
+    private IUIService uiService;
+    private Transform cachedTransform;
+
+    private static readonly int FlipTriggerHash = Animator.StringToHash("Flip");
+    private static readonly int ResetTriggerHash = Animator.StringToHash("Reset");
+
+    private void Awake()
+    {
+        cachedTransform = transform;
+    }
+
+    public void SetGameManager(IGameManager gameManager)
+    {
+        this.gameManager = gameManager;
+    }
+
+    public void SetUIService(IUIService uiService)
+    {
+        this.uiService = uiService;
+    }
 
     public void Init()
     {
-        name = index + "";
+        name = index.ToString();
         graphic.Init();
     }
 
     public void BtnClick()
     {
         if (isFlipped) return;
-        animator.SetTrigger("Flip");
+        animator.SetTrigger(FlipTriggerHash);
         isFlipped = true;
-        ItemsHandler.inst.OnItemBtnClick(this);
+        gameManager?.OnItemFlipped(this);
     }
 
-    internal void ResetItem()
+    public void ResetItem()
     {
-        //print("reset called: " + name) ;
-        animator.SetTrigger("Reset");
+        animator.SetTrigger(ResetTriggerHash);
         isFlipped = false;
     }
 
-    internal void DestroyItem()
+    public void DestroyItem()
     {
-        for (int i = 0; i < transform.childCount; i++)
+        int childCount = cachedTransform.childCount;
+        for (int i = 0; i < childCount; i++)
         {
-            var item = transform.GetChild(i);
-            iTween.ScaleTo(item.gameObject, iTween.Hash("scale", Vector3.zero, "time", 0.5f, "easetype", iTween.EaseType.easeInElastic));
-            UIManager.inst.DelayedAction(() =>
+            Transform childTransform = cachedTransform.GetChild(i);
+            GameObject childObj = childTransform.gameObject;
+
+            iTween.ScaleTo(childObj, iTween.Hash("scale", Vector3.zero, "time", 0.5f, "easetype", iTween.EaseType.easeInElastic));
+
+            int capturedIndex = i;
+            uiService?.DelayedAction(() =>
             {
-                if(item) item.gameObject.SetActive(false);
+                Transform child = cachedTransform.GetChild(capturedIndex);
+                if (child != null)
+                {
+                    child.gameObject.SetActive(false);
+                }
             }, 0.7f);
         }
-        ItemsHandler.inst.UpdateStageData(transform.GetSiblingIndex());
+        gameManager?.UpdateStageData(cachedTransform.GetSiblingIndex());
     }
 }

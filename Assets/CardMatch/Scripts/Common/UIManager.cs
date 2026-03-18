@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class UIManager : MonoBehaviour
+public class UIManager : MonoBehaviour, IUIService
 {
     public static UIManager inst;
     [Header("Panels")]
@@ -24,10 +24,15 @@ public class UIManager : MonoBehaviour
     public TMP_Text comboTxt;
     [Header("Others")]
     public TMP_Text timeString;
-    Coroutine timer;
+
+    private Coroutine timer;
+    private WaitForSeconds oneSecondWait;
+    private readonly Dictionary<float, WaitForSeconds> waitCache = new Dictionary<float, WaitForSeconds>();
+
     private void Awake()
     {
         inst = this;
+        oneSecondWait = new WaitForSeconds(1f);
     }
 
     private void OnEnable()
@@ -62,13 +67,17 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    void ResetGame()
+    private void ResetGame()
     {
         gameOverPanel.SetActive(false);
         currTime = totalTime;
         currScore = 0;
         Time.timeScale = 1;
-        if(timer != null) StopCoroutine(timer);
+        if (timer != null)
+        {
+            StopCoroutine(timer);
+            timer = null;
+        }
     }
 
 
@@ -89,15 +98,19 @@ public class UIManager : MonoBehaviour
 
     public void PauseBtnClick()
     {
-        StopCoroutine(timer);
-        pausePanel.gameObject.SetActive(true);
+        if (timer != null)
+        {
+            StopCoroutine(timer);
+            timer = null;
+        }
+        pausePanel.SetActive(true);
         Time.timeScale = 0;
     }
 
     public void ResumeBtnClick()
     {
         Time.timeScale = 1;
-        pausePanel.gameObject.SetActive(false);
+        pausePanel.SetActive(false);
         timer = StartCoroutine(StartTime());
     }
 
@@ -117,16 +130,17 @@ public class UIManager : MonoBehaviour
 
     #endregion
 
-    IEnumerator StartTime()
+    private IEnumerator StartTime()
     {
         while (currTime > 0)
         {
             int t = Mathf.CeilToInt(Mathf.Clamp(currTime, 0, totalTime));
             timeString.text = t.ToString();
-            yield return new WaitForSeconds(1f);
+            yield return oneSecondWait;
             currTime -= 1;
         }
         gameOverPanel.SetActive(true);
+        timer = null;
     }
 
     public void UpdateScore(int score)
@@ -150,9 +164,31 @@ public class UIManager : MonoBehaviour
     {
         StartCoroutine(InvokeAfterDelay(action, delay));
     }
+
     private IEnumerator InvokeAfterDelay(Action action, float delay)
     {
-        yield return new WaitForSeconds(delay);
+        if (!waitCache.TryGetValue(delay, out WaitForSeconds wait))
+        {
+            wait = new WaitForSeconds(delay);
+            waitCache[delay] = wait;
+        }
+
+        yield return wait;
         action?.Invoke();
+    }
+
+    public void ShowComboText(string text, bool isActive)
+    {
+        comboTxt.text = text;
+        comboTxt.gameObject.SetActive(isActive);
+    }
+
+    public void ShowWinPanel()
+    {
+        DelayedAction(() =>
+        {
+            TurnOffAllPanels();
+            winPanel.gameObject.SetActive(true);
+        }, 0.5f);
     }
 }

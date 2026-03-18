@@ -5,14 +5,26 @@ using UnityEngine.UI;
 public class GridSizeSwitch : MonoBehaviour
 {
     public Button btn;
-    TMP_Text text;
     public int row, column;
+
+    private TMP_Text text;
+    private IGameManager gameManager;
+    private UIManager uiManager;
 
     private void OnValidate()
     {
         btn = GetComponent<Button>();
         text = GetComponentInChildren<TMP_Text>();
-        text.text = row + " x " + column;
+        if (text != null)
+        {
+            text.text = row + " x " + column;
+        }
+    }
+
+    private void Start()
+    {
+        gameManager = ItemsHandler.inst;
+        uiManager = UIManager.inst;
     }
 
     private void OnEnable()
@@ -27,7 +39,14 @@ public class GridSizeSwitch : MonoBehaviour
 
     private void BtnClick()
     {
-        ItemsHandler.inst.OnGridSwitchOn(row, column);
-        UIManager.inst.StartGame();
+        if (gameManager != null)
+        {
+            ItemsHandler.inst.OnGridSwitchOn(row, column);
+        }
+
+        if (uiManager != null)
+        {
+            uiManager.StartGame();
+        }
     }
 }

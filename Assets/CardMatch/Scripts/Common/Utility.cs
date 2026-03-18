@@ -50,23 +50,29 @@ public static class Rand
 
     public static int[] GetIntUniqueArray(int length, int minVal, int maxVal)
     {
-        if (length <= maxVal - minVal)
+        int range = maxVal - minVal;
+        if (length > range)
         {
-            int[] a = new int[length];
-            for (int i = 0; i < length; i++)
-            {
-            DR:
-                int k = GetInt(minVal, maxVal);
-                if (a.Contains(k)) goto DR;
-                a[i] = k;
-            }
-            return a;
-        }
-        else
-        {
-            Debug.LogError("length must be less then difference of min max");
+            Debug.LogError($"length ({length}) must be less than or equal to range ({range})");
             return new int[0];
         }
+
+        // Fisher-Yates shuffle algorithm for better performance
+        int[] pool = new int[range];
+        for (int i = 0; i < range; i++)
+        {
+            pool[i] = minVal + i;
+        }
+
+        int[] result = new int[length];
+        for (int i = 0; i < length; i++)
+        {
+            int randomIndex = r.Next(i, range);
+            result[i] = pool[randomIndex];
+            pool[randomIndex] = pool[i];
+        }
+
+        return result;
     }
 
     public static float GetFloat(float max = 1)
