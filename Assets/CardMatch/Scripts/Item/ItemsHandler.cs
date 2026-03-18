@@ -37,10 +37,14 @@ public class ItemsHandler : MonoBehaviour, IGameManager
         currStageData = new StageData();
         currStageData.cardItems = new List<CardItemData>();
 
-        uiService = UIManager.inst;
-        comboService = new ComboService(uiService);
         itemFactory = new ItemFactory(itemPrefab, itemPerent, sprites, redSprite, yellowSprite);
         saveLoadService = new SaveLoadService(Utility.stageDataPath, Utility.StageDataSavePrefKey);
+    }
+
+    private void Start()
+    {
+        uiService = UIManager.inst;
+        comboService = new ComboService(uiService);
     }
 
     #region Item Generation
@@ -104,11 +108,13 @@ public class ItemsHandler : MonoBehaviour, IGameManager
                     if (itemCount == 0)
                     {
                         comboService.EndCombo();
+                        AudioManager.inst?.PlayWin();
                         uiService.ShowWinPanel();
                     }
                 }
                 else
                 {
+                    AudioManager.inst?.PlayMismatch();
                     comboService.EndCombo();
                     resetItemsCoroutine = StartCoroutine(ResetFaultItems());
                 }

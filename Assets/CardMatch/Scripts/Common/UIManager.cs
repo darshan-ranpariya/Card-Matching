@@ -84,12 +84,14 @@ public class UIManager : MonoBehaviour, IUIService
     #region ClickMethods
     public void StartBtnClick()
     {
+        AudioManager.inst?.PlayButtonClick();
         TurnOffAllPanels();
         gridPanel.gameObject.SetActive(true);
     }
 
     public void StartGame()
     {
+        AudioManager.inst?.PlayButtonClick();
         TurnOffAllPanels();
         currScoreTxt.text = currScore.ToString();
         gamePlayPanel.gameObject.SetActive(true);
@@ -98,6 +100,7 @@ public class UIManager : MonoBehaviour, IUIService
 
     public void PauseBtnClick()
     {
+        AudioManager.inst?.PlayButtonClick();
         if (timer != null)
         {
             StopCoroutine(timer);
@@ -109,6 +112,7 @@ public class UIManager : MonoBehaviour, IUIService
 
     public void ResumeBtnClick()
     {
+        AudioManager.inst?.PlayButtonClick();
         Time.timeScale = 1;
         pausePanel.SetActive(false);
         timer = StartCoroutine(StartTime());
@@ -116,6 +120,7 @@ public class UIManager : MonoBehaviour, IUIService
 
     public void HomeBtnClick()
     {
+        AudioManager.inst?.PlayButtonClick();
         ResetGame();
         if (pausePanel.gameObject.activeInHierarchy) pausePanel.gameObject.SetActive(false);
         TurnOffAllPanels();
@@ -124,6 +129,7 @@ public class UIManager : MonoBehaviour, IUIService
 
     public void RestartBtnClick()
     {
+        AudioManager.inst?.PlayButtonClick();
         ResetGame();
         StartBtnClick();
     }
@@ -139,6 +145,7 @@ public class UIManager : MonoBehaviour, IUIService
             yield return oneSecondWait;
             currTime -= 1;
         }
+        AudioManager.inst?.PlayGameOver();
         gameOverPanel.SetActive(true);
         timer = null;
     }

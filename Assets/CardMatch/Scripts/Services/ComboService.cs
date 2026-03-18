@@ -62,11 +62,13 @@ public class ComboService
         if (comboCount == 1)
         {
             Debug.Log("First match!");
+            AudioManager.inst?.PlayMatch();
             uiService.ShowComboText("", false);
         }
         else
         {
             Debug.Log($"COMBO x{comboCount}! +{matchScore} points");
+            AudioManager.inst?.PlayCombo();
             uiService.ShowComboText($"COMBO x {comboCount} !", true);
         }
     }

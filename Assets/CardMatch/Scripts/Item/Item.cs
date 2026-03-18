@@ -38,6 +38,7 @@ public class Item : MonoBehaviour
     public void BtnClick()
     {
         if (isFlipped) return;
+        AudioManager.inst?.PlayCardFlip();
         animator.SetTrigger(FlipTriggerHash);
         isFlipped = true;
         gameManager?.OnItemFlipped(this);

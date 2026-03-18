@@ -48,7 +48,7 @@ public class ItemFactory
         int[] spriteIndexes = Rand.GetIntUniqueArray(totalItemCount / 2, 0, sprites.sprites.Count);
         int[] totalIndexes = Rand.GetIntUniqueArray(totalItemCount, 0, totalItemCount + 1);
 
-        for (int i = 0, j = 0; i < totalItemCount - 1; i += 2, j++)
+        for (int i = 0, j = 0; i < totalItemCount; i += 2, j++)
         {
             int idx0 = totalIndexes[i] == totalItemCount ? 0 : totalIndexes[i];
             int idx1 = totalIndexes[i + 1] == totalItemCount ? 0 : totalIndexes[i + 1];
